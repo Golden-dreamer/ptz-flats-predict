@@ -387,7 +387,7 @@ def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
     
     example = XDfWithoutTransformedCols.join(transformed)
     predictedValue = getPrediction(example , model)
-    children = ['predicted price = ', predictedValue]
+    children = ['predicted price = ', predictedValue, 'сотен тысяч рублей']
     # idx = list(X.index)
     # val = list(X.values)
     # zp = list(zip(idx, val))
