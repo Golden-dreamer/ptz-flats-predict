@@ -1,10 +1,10 @@
 # ptz-flats-predict
 This project predicts flat price in city of Petrozavodsk in real-time, using machine learning techniques.
 Current status:
-* [ ] gather the data
-* [ ] handle the data
-* [ ] analyse the data
-* [ ] build the model
+* [x] gather the data
+* [x] handle the data
+* [x] analyse the data
+* [x] build the model
 * [x] create web application
 * [ ] released
 ## How it works
