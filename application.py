@@ -23,10 +23,8 @@ def getPrediction(X, model):
     y_predicted = model.predict(oneSample)[0]
     return y_predicted
 
-# TODO do I need this?
 
-
-def getYearCategories(df):
+def splitYearCategoriesInDataFrame(df):
     '''
     get year categories splitting, based on df year values
     '''
@@ -37,11 +35,10 @@ def getYearCategories(df):
                        df['Год постройки'].max(), bin_split)
     year = pd.cut(df['Год постройки'], bins=bins)
     X_year_bins['Год постройки'] = year
-    return X_year_bins['Год постройки'].unique()
+    return X_year_bins
 
 
-def getModel():
-    PATH = './models/model.pkl'
+def getModel(PATH):
     with open(PATH, "rb") as f:
         model = pickle.load(f)
     return model
@@ -101,27 +98,31 @@ def initX(CURRENT_X_DATA, dfFromInit, yearCategories=None):
     return X
 
 
-dfPATH = 'data/learningData.csv'
-df = pd.read_csv(dfPATH, index_col='Код объекта')
+# Attention: usage df2 and yearCategories !!!
 
-yearCategories = getYearCategories(df)
 
-# transform year data
-bins = np.linspace(df['Год постройки'].min(), df['Год постройки'].max(), 5)
-year = pd.cut(df['Год постройки'], bins=bins)
-df2 = df.copy()
-df2['Год постройки'] = year
+def createExampleFromUserInfo(CURRENT_X_DATA):
+    X = initX(CURRENT_X_DATA, flatDF_withYearFix, yearCategories)
+    XDf = X.to_frame().T
+    transformed = ohe.transform(XDf[oheCols])
+    transformed = pd.DataFrame(transformed, index=XDf.index)
 
-yearCategories = df2['Год постройки'].unique()
+    XDfWithoutTransformedCols = XDf.drop(columns=oheCols)
 
-ohe = OneHotEncoder(sparse=False)
-oheCols = ['Материал окон', 'Счетчик воды', 'Балкон', 'Серия', 'Стены',
-           'Адрес', 'Год постройки', 'Двор']
-ohe.fit(df2[oheCols])
+    example = XDfWithoutTransformedCols.join(transformed)
+    return example
 
-model = getModel()
 
-app = Dash(__name__)
+def isNotAllFieldsFilled(*args):
+    for arg in args:
+        if (arg is None) or (arg is np.nan):
+            return True
+    return False
+
+
+def makeBeautyDigits(value):
+    assert type(value) is int, 'predicted value must be int!'
+    return "{:,}".format(value)
 
 
 def generateTable(dataframe, max_rows=10):
@@ -247,10 +248,27 @@ def renovationFeatDash():
         )
 
 
+dfPATH = 'data/learningData.csv'
+modelPATH = 'models/model.pkl'
+flatDF = pd.read_csv(dfPATH, index_col='Код объекта')
+flatDF_withYearFix = splitYearCategoriesInDataFrame(flatDF)
+
+yearCategories = flatDF_withYearFix['Год постройки'].unique()
+
+ohe = OneHotEncoder(sparse=False)
+oheCols = ['Материал окон', 'Счетчик воды', 'Балкон', 'Серия', 'Стены',
+           'Адрес', 'Год постройки', 'Двор']
+# 'train' ohe
+ohe.fit(flatDF_withYearFix[oheCols])
+
+model = getModel(modelPATH)
+
+app = Dash(__name__)
+
 app.layout = html.Div(children=[
     html.H1(children='Flat price prediction'),
     html.H3('first 10 rows from data'),
-    generateTable(df, max_rows=10),
+    generateTable(flatDF, max_rows=10),
     html.H2(id='prediction-output', children=['predicted price = ']),
     html.Button(id='predict-button-state', children='Predict'),
     html.H4('Вид из окна: '),
@@ -289,27 +307,6 @@ app.layout = html.Div(children=[
     ])
 
 
-def isNotAllFieldsFilled(*args):
-    for arg in args:
-        if arg is None or arg is np.nan:
-            return True
-    return False
-
-# Attention: usage df2 and yearCategories !!!
-
-
-def createExampleFromUserInfo(CURRENT_X_DATA):
-    X = initX(CURRENT_X_DATA, df2, yearCategories)
-    XDf = X.to_frame().T
-    transformed = ohe.transform(XDf[oheCols])
-    transformed = pd.DataFrame(transformed, index=XDf.index)
-
-    XDfWithoutTransformedCols = XDf.drop(columns=oheCols)
-
-    example = XDfWithoutTransformedCols.join(transformed)
-    return example
-
-
 # make prediction after button pressed
 @app.callback(
     Output(component_id='prediction-output', component_property='children'),
@@ -336,11 +333,11 @@ def createExampleFromUserInfo(CURRENT_X_DATA):
 def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
                 ser, wallm, yr, sq, ad,
                 ch, yd, rn, ren):
-    if isNotAllFieldsFilled(sv, pk, wm, wc, blc, tf,
+    if isNotAllFieldsFilled(wm, wc, blc, tf,
                             ser, wallm, yr, sq, ad,
                             ch, yd, rn, ren):
         return 'Fill all fields'
-    CURRENT_X_DATA = pd.Series()
+    CURRENT_X_DATA = pd.Series(dtype=object)
     CURRENT_X_DATA['streetView'] = sv
     CURRENT_X_DATA['parking'] = pk
     CURRENT_X_DATA['windowMaterial'] = wm
@@ -358,8 +355,9 @@ def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
     CURRENT_X_DATA['renovation'] = ren
 
     example = createExampleFromUserInfo(CURRENT_X_DATA)
-    predictedValue = getPrediction(example, model)
-    children = ['predicted price = ', predictedValue, ' сотен тысяч рублей']
+    predictedValue = round(getPrediction(example, model))
+    valueString = makeBeautyDigits(predictedValue)
+    children = 'predicted price: ' + valueString + ',000 рублей'
 
     return children
 
