@@ -12,64 +12,116 @@ import pickle
 
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
-import plotly.express as px
+# import plotly.express as px
 
 from sklearn.preprocessing import OneHotEncoder
 
 
-
-def getPrediction(X,model):
+def getPrediction(X, model):
     # signle sample
     oneSample = X.to_numpy().reshape(1, -1)
-    #oneSample = X.to_frame().T
     y_predicted = model.predict(oneSample)[0]
     return y_predicted
 
-#TODO  need remake
-def perfomYearSplitting(X):
-    assert 'Год постройки' in X.columns, 'KeyError: "Год постройки" not in X.columns'
-    X_year_bins = X.copy()
+# TODO do I need this?
+
+
+def getYearCategories(df):
+    '''
+    get year categories splitting, based on df year values
+    '''
+    assert 'Год постройки' in df.columns, 'KeyError: "Год постройки" not in df'
+    X_year_bins = df.copy()
     bin_split = 5
-    bins = np.linspace(X['Год постройки'].min(), X['Год постройки'].max(), bin_split)
-    year = pd.cut(X['Год постройки'], bins=bins)
+    bins = np.linspace(df['Год постройки'].min(),
+                       df['Год постройки'].max(), bin_split)
+    year = pd.cut(df['Год постройки'], bins=bins)
     X_year_bins['Год постройки'] = year
-    return X_year_bins
-
-def renovationEncode(X):
-    assert 'Ремонт' in X, 'KeyError: "Ремонт" not in X.columns'
-    columnValues = {'Черновая отделка': 0, 'Улучшенная черновая отделка': 1,
-                    'Требует ремонта': 2, 'Частичный ремонт': 3,
-                    'Косметический ремонт': 4, 'Современный ремонт': 5,
-                    'Ремонт по дизайн проекту': 6}
-    # 1 column with labeled renovation
-    XNew = X.copy()
-    #renovationType = XNew['Ремонт']
-    #renovationType = str(renovationType)
-    #XNew['Ремонт'] = columnValues[renovationType]
-    #return XNew
-    return 2
-
-
-def createExample(dataframe=None, ilocIdx=0):
-    if dataframe is not None:
-        assert 'цена' in dataframe.columns, 'KeyError: "цена" not in df.columns'
-        df = dataframe.drop(columns=['цена'])
-        dfWithYearsSplitted = perfomYearSplitting(df)
-        X_renovation = renovationEncode(dfWithYearsSplitted)
-        X_dummyRenovation = pd.get_dummies(X_renovation)
-        # one row is example
-        example = X_dummyRenovation.iloc[ilocIdx]
-    else:
-        raise NotImplementedError()
-    return example
+    return X_year_bins['Год постройки'].unique()
 
 
 def getModel():
-    """Get prepared for further handling model."""
     PATH = './models/model.pkl'
     with open(PATH, "rb") as f:
         model = pickle.load(f)
     return model
+
+
+def initX(CURRENT_X_DATA, dfFromInit, yearCategories=None):
+    assert yearCategories is not None
+    assert 'цена' in dfFromInit.columns
+    # X = pd.Series(dtype='object')
+    # Take first row as first X, then replace values
+    # it is need in order to put right feats in right order into model
+    X = dfFromInit.iloc[0].drop('цена')
+    streetView = CURRENT_X_DATA['streetView']
+    allView = ['трассы', 'автомобильные мосты', 'памятники архитектуры',
+               'культуры', 'пешеходные бульвары']
+    for view in allView:
+        X[view] = view in streetView
+
+    X['Материал окон'] = CURRENT_X_DATA['windowMaterial']
+    X['Счетчик воды'] = CURRENT_X_DATA['waterCounter']
+
+    currentParking = CURRENT_X_DATA['parking']
+    parking = ['подземный паркинг', 'гостевой паркинг']
+    for park in parking:
+        X[park] = park in currentParking
+
+    X['Балкон'] = CURRENT_X_DATA['balcony']
+    X['всего этажей'] = CURRENT_X_DATA['totalFloor']
+
+    X['Серия'] = CURRENT_X_DATA['series']
+    X['Стены'] = CURRENT_X_DATA['wallsMaterial']
+
+    X['Адрес'] = CURRENT_X_DATA['adress']
+
+    X['Общая площадь'] = CURRENT_X_DATA['square']
+# TODO problem in the futureб probably
+    year = CURRENT_X_DATA['year']
+    for category in yearCategories:
+        if category is np.nan:
+            continue
+        if year in category:
+            X['Год постройки'] = category
+            break
+
+    X['Высота потолков'] = CURRENT_X_DATA['ceilHeight']
+    X['Двор'] = CURRENT_X_DATA['yardType']
+
+    X['Комнатность'] = CURRENT_X_DATA['roomNumber']
+
+    columnValues = {'Черновая отделка': 0, 'Улучшенная черновая отделка': 1,
+                    'Требует ремонта': 2, 'Частичный ремонт': 3,
+                    'Косметический ремонт': 4, 'Современный ремонт': 5,
+                    'Ремонт по дизайн проекту': 6}
+    renovation = CURRENT_X_DATA['renovation']
+    X['Ремонт'] = columnValues[renovation]
+
+    return X
+
+
+dfPATH = 'data/learningData.csv'
+df = pd.read_csv(dfPATH, index_col='Код объекта')
+
+yearCategories = getYearCategories(df)
+
+# transform year data
+bins = np.linspace(df['Год постройки'].min(), df['Год постройки'].max(), 5)
+year = pd.cut(df['Год постройки'], bins=bins)
+df2 = df.copy()
+df2['Год постройки'] = year
+
+yearCategories = df2['Год постройки'].unique()
+
+ohe = OneHotEncoder(sparse=False)
+oheCols = ['Материал окон', 'Счетчик воды', 'Балкон', 'Серия', 'Стены',
+           'Адрес', 'Год постройки', 'Двор']
+ohe.fit(df2[oheCols])
+
+model = getModel()
+
+app = Dash(__name__)
 
 
 def generateTable(dataframe, max_rows=10):
@@ -84,117 +136,20 @@ def generateTable(dataframe, max_rows=10):
         ])
     ])
 
-#TODO probablt, need right naming
-def initGlobal():
-    currentData = pd.Series()
-    currentData['streetView'] = None
-    currentData['windowMaterial'] = None
-    currentData['waterCounter'] = None
-    currentData['parking'] = None
-    currentData['balcony'] = None
-    currentData['totalFloor'] = None
-    currentData['series'] = None
-    currentData['wallsMaterial'] = None
-    currentData['adress'] = None
-    currentData['year'] = None
-    currentData['square'] = None
-    currentData['ceilHeight'] = None
-    currentData['yardType'] = None
-    currentData['roomNumber'] = None
-    currentData['renovation'] = None
-    return currentData
-
-
-def initX(CURRENT_X_DATA, yearCategories=None):
-    assert yearCategories is not None
-    #X = pd.Series(dtype='object')
-    X = df2.iloc[0].drop('цена')
-    streetView = CURRENT_X_DATA['streetView']
-    allView = ['трассы', 'автомобильные мосты', 'памятники архитектуры', 
-               'культуры', 'пешеходные бульвары']
-    for view in allView:
-        X[view] = view in streetView
-    
-    X['Материал окон'] = CURRENT_X_DATA['windowMaterial']
-    X['Счетчик воды'] = CURRENT_X_DATA['waterCounter']
-    
-    currentParking = CURRENT_X_DATA['parking']
-    parking = ['подземный паркинг', 'гостевой паркинг']
-    for park in parking:
-        X[park] = park in currentParking
-
-    X['Балкон'] = CURRENT_X_DATA['balcony']
-    X['всего этажей'] = CURRENT_X_DATA['totalFloor']
-    
-    X['Серия'] = CURRENT_X_DATA['series']
-    X['Стены'] = CURRENT_X_DATA['wallsMaterial']
-    
-    X['Адрес'] = CURRENT_X_DATA['adress']
-    
-    X['Общая площадь'] = CURRENT_X_DATA['square']
-#TODO problem in the future
-    year = CURRENT_X_DATA['year']
-    for category in yearCategories:
-        if category is np.nan:
-            continue
-        if year in category:
-            X['Год постройки'] = category
-            break
-
-    X['Высота потолков'] = CURRENT_X_DATA['ceilHeight']
-    X['Двор'] = CURRENT_X_DATA['yardType']
-    
-    X['Комнатность'] = CURRENT_X_DATA['roomNumber']
-    
-    columnValues = {'Черновая отделка': 0, 'Улучшенная черновая отделка': 1,
-                    'Требует ремонта': 2, 'Частичный ремонт': 3,
-                    'Косметический ремонт': 4, 'Современный ремонт': 5,
-                    'Ремонт по дизайн проекту': 6}
-    renovation = CURRENT_X_DATA['renovation']
-    X['Ремонт'] = columnValues[renovation]
-    
-    return X
-
-
-#global CURRENT_X_DATA
-#CURRENT_X_DATA = initGlobal()
-
-
-#TODO need remake of this place
-dfPATH = 'data/learningData.csv'
-df = pd.read_csv(dfPATH, index_col='Код объекта')
-splitting = perfomYearSplitting(df)['Год постройки']
-yearCategories = splitting.unique()
-
-#transform year data
-bins = np.linspace(df['Год постройки'].min(), df['Год постройки'].max(), 5) # 5
-year = pd.cut(df['Год постройки'], bins=bins)
-#df2 = right df
-df2 = df.copy()
-df2['Год постройки'] = year
-
-oheCols = ['Материал окон', 'Счетчик воды', 'Балкон', 'Серия', 'Стены',
-       'Адрес', 'Год постройки', 'Двор']
-ohe = OneHotEncoder(sparse=False)
-ohe.fit(df2[oheCols])
-
-
-model = getModel()
-#predictedValue = getPrediction(X, model)
-app = Dash(__name__)
 
 def streetViewFeatDash():
     return dcc.Checklist(
-        ['трасса', 'автомобильный мост', 'памятники архитектуры', 
+        ['трасса', 'автомобильный мост', 'памятники архитектуры',
          'памятники культуры', 'пешеходные бульвары'
-        ],
+         ],
         value=[],
         id='streetViewBox'
         )
 
+
 def parkingFeatDash():
     return dcc.Checklist(
-        ['Подземный паркинг', 'Гостевой паркинг', 'Отсутствует\иное'],
+        ['Подземный паркинг', 'Гостевой паркинг', 'Отсутствует/иное'],
         value=[],
         id='parking'
         )
@@ -206,6 +161,7 @@ def windowFeatDash():
         value='',
         id='windowMaterial'
         )
+
 
 def waterCounterFeatDash():
     return dcc.RadioItems(
@@ -221,16 +177,17 @@ def balconyFeatDash():
         id='balcony'
         )
 
+
 def totalFloorFeatDash():
     return dcc.Input(
-        id='totalFloor', value=1, type='number'
+        id='totalFloor', value=1, type='number', min=1, max=30
         )
 
 
 def seriesFeatDash():
     return dcc.RadioItems(
         ['Инд', 'Общ', '75 ', '1-335А', '1-335', 'Хрущ', '335-с',
-               '2-68-1-0', 'Бреж', 'А-1', '75.1, 3-75'],
+         '2-68-1-0', 'Бреж', 'А-1', '75.1, 3-75'],
         id='series'
         )
 
@@ -252,19 +209,19 @@ def adressFeatDash():
 
 def yearFeatDash():
     return dcc.Input(
-        id='year', type='number'
+        id='year', type='number', min=1900, max=2021
         )
 
 
 def squareFeatDash():
     return dcc.Input(
-        id='square', type='number'
+        id='square', type='number', min=1, max=10000
         )
 
 
 def ceilHeightFeatDash():
     return dcc.Input(
-        id='ceilHeight', type='number'
+        id='ceilHeight', type='number', min=0, max=100
         )
 
 
@@ -277,7 +234,7 @@ def yardTypeFeatDash():
 
 def roomNumberFeatDash():
     return dcc.Input(
-        id='roomNumber', type='number'
+        id='roomNumber', type='number', min=1
         )
 
 
@@ -289,15 +246,16 @@ def renovationFeatDash():
         id='renovation'
         )
 
+
 app.layout = html.Div(children=[
-    html.H1(children='Hellow Dash'),
-    generateTable(df),
+    html.H1(children='Flat price prediction'),
+    html.H3('first 10 rows from data'),
+    generateTable(df, max_rows=10),
     html.H2(id='prediction-output', children=['predicted price = ']),
     html.Button(id='predict-button-state', children='Predict'),
     html.H4('Вид из окна: '),
     html.Div([
         streetViewFeatDash(),
-        #html.P('streetView value = ', id='asa'),
         html.H4('Тип парковки: '),
         parkingFeatDash(),
         html.H4('Материал окон: '),
@@ -331,42 +289,64 @@ app.layout = html.Div(children=[
     ])
 
 
+def isNotAllFieldsFilled(*args):
+    for arg in args:
+        if arg is None or arg is np.nan:
+            return True
+    return False
+
+# Attention: usage df2 and yearCategories !!!
+
+
+def createExampleFromUserInfo(CURRENT_X_DATA):
+    X = initX(CURRENT_X_DATA, df2, yearCategories)
+    XDf = X.to_frame().T
+    transformed = ohe.transform(XDf[oheCols])
+    transformed = pd.DataFrame(transformed, index=XDf.index)
+
+    XDfWithoutTransformedCols = XDf.drop(columns=oheCols)
+
+    example = XDfWithoutTransformedCols.join(transformed)
+    return example
+
+
 # make prediction after button pressed
 @app.callback(
     Output(component_id='prediction-output', component_property='children'),
     Input('predict-button-state', 'n_clicks'),
     State('streetViewBox', 'value'),
     State('parking', 'value'),
-    
+
     State('windowMaterial', 'value'),
     State('waterCounter', 'value'),
     State('balcony', 'value'),
     State('totalFloor', 'value'),
-    
+
     State('series', 'value'),
     State('wallsMaterial', 'value'),
     State('year', 'value'),
     State('square', 'value'),
     State('adress', 'value'),
-    
+
     State('ceilHeight', 'value'),
     State('yardType', 'value'),
     State('roomNumber', 'value'),
     State('renovation', 'value'),
     )
-def makePredict(n_clicks, sv, pk, wm, wc, blc, tf, 
-                ser, wallm, yr, sq, ad, 
+def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
+                ser, wallm, yr, sq, ad,
                 ch, yd, rn, ren):
-    if ren is None:
+    if isNotAllFieldsFilled(sv, pk, wm, wc, blc, tf,
+                            ser, wallm, yr, sq, ad,
+                            ch, yd, rn, ren):
         return 'Fill all fields'
-    #global CURRENT_X_DATA
     CURRENT_X_DATA = pd.Series()
     CURRENT_X_DATA['streetView'] = sv
     CURRENT_X_DATA['parking'] = pk
     CURRENT_X_DATA['windowMaterial'] = wm
     CURRENT_X_DATA['waterCounter'] = wc
     CURRENT_X_DATA['balcony'] = blc
-    CURRENT_X_DATA['totalFloor'] = tf    
+    CURRENT_X_DATA['totalFloor'] = tf
     CURRENT_X_DATA['series'] = ser
     CURRENT_X_DATA['wallsMaterial'] = wallm
     CURRENT_X_DATA['year'] = yr
@@ -376,29 +356,12 @@ def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
     CURRENT_X_DATA['yardType'] = yd
     CURRENT_X_DATA['roomNumber'] = rn
     CURRENT_X_DATA['renovation'] = ren
-    
-    X = initX(CURRENT_X_DATA, yearCategories)
-    #X2 = df2.iloc[0]
-    XDf = X.to_frame().T
-    XDfWithoutTransformedCols = XDf.drop(columns=oheCols)
-    
-    transformed = ohe.transform(XDf[oheCols])
-    transformed  = pd.DataFrame(transformed, index=XDfWithoutTransformedCols.index)
-    
-    example = XDfWithoutTransformedCols.join(transformed)
-    predictedValue = getPrediction(example , model)
-    children = ['predicted price = ', predictedValue, 'сотен тысяч рублей']
-    # idx = list(X.index)
-    # val = list(X.values)
-    # zp = list(zip(idx, val))
-    
-    # idx2 = list(X2.index)
-    # val2 = list(X2.values)
-    # zp2 = list(zip(idx2, val2))
-    
-    return children
 
-    #return str(zp) + '\n' +  str(predictedValue) + str(zp2) + '\n'
+    example = createExampleFromUserInfo(CURRENT_X_DATA)
+    predictedValue = getPrediction(example, model)
+    children = ['predicted price = ', predictedValue, ' сотен тысяч рублей']
+
+    return children
 
 
 if __name__ == '__main__':
