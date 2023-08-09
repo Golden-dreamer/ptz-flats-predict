@@ -6,6 +6,12 @@ Created on Thu Jan 13 08:57:53 2022
 @author: leo
 """
 import pandas as pd
+
+# black magic
+import __main__
+__main__.pd = pd
+# just black magic, do not look at that
+
 import numpy as np
 
 import dill
