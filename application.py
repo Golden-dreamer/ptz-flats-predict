@@ -292,13 +292,15 @@ flatDF = pd.read_csv(dfPATH, index_col='Код объекта')
 model = getModel(modelPATH)
 
 app = Dash(__name__)
+server = app.server
 
 app.layout = html.Div(children=[
-    html.H1(children='Flat price prediction'),
-    html.H3('first 10 rows from data'),
-    generateTable(flatDF, max_rows=10),
+    html.H1(children='Предсказание цены квартиры'),
+    html.H2(children='заполните все поля, чтобы получить оценочную стоимость квартиры'),
+    html.H3('первые 5 строк из данных, на которых обучался алгоритм'),
+    generateTable(flatDF, max_rows=5),
     html.H2(id='prediction-output', children=['predicted price = ']),
-    html.Button(id='predict-button-state', children='Predict'),
+    html.Button(id='predict-button-state', children='получить предсказание'),
     html.H4('Вид из окна: '),
     html.Div([
         streetViewFeatDash(),
@@ -310,9 +312,9 @@ app.layout = html.Div(children=[
         waterCounterFeatDash(),
         html.H4('Тип балкона:'),
         balconyFeatDash(),
-        html.H4('Всего этажей:'),
+        html.H4('Всего этажей в доме:'),
         totalFloorFeatDash(),
-        html.H4('Серия?:'),
+        html.H4('Серия:'),
         seriesFeatDash(),
         html.H4('Материалы стен:'),
         wallMaterialFeatDash(),
@@ -331,9 +333,8 @@ app.layout = html.Div(children=[
         html.H4('Тип ремонта:'),
         renovationFeatDash(),
         html.Br()
+        ])
     ])
-])
-
 
 # make prediction after button pressed
 @app.callback(
