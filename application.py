@@ -8,7 +8,8 @@ Created on Thu Jan 13 08:57:53 2022
 import pandas as pd
 import numpy as np
 
-import dill as pickle
+import dill
+import pickle
 
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
@@ -19,7 +20,7 @@ from dash.dependencies import Input, Output, State
 
 def load_column_transformer():
     with open('./models/pipeline.pkl', 'rb') as pipe:
-        ct = pickle.load(pipe)
+        ct = dill.load(pipe)
     return ct
 
 
