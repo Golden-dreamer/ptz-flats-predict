@@ -91,7 +91,6 @@ def convert2DataFrame(CURRENT_DATA_FROM_USER):
     df = pd.DataFrame.from_dict(CURRENT_DATA_FROM_USER, orient='index').T
     df.columns = cols
     df = df.join(df_streetView_and_parking)
-    print(df.dtypes)
     # convert col types
     numeric_float_cols = ['Высота потолков', 'Общая площадь']
     numeric_int_cols = ['всего этажей', 'Год постройки', 'Комнатность']
@@ -99,7 +98,6 @@ def convert2DataFrame(CURRENT_DATA_FROM_USER):
     df[numeric_float_cols] = df[numeric_float_cols].astype(float)
     df[numeric_int_cols] = df[numeric_int_cols].astype(int)
     df[object_cols] = df[object_cols].astype(object)
-    print(df.dtypes)
     return df
 
 
@@ -343,7 +341,6 @@ def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
     CURRENT_X_DATA['yardType'] = yd
     CURRENT_X_DATA['roomNumber'] = rn
     CURRENT_X_DATA['renovation'] = ren
-    print(CURRENT_X_DATA)
 
     df = convert2DataFrame(CURRENT_X_DATA)
     df = prepare_df_from_user(df)
