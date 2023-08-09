@@ -8,60 +8,13 @@ Created on Thu Jan 13 08:57:53 2022
 import pandas as pd
 import numpy as np
 
-import pickle
+import dill as pickle
 
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
 # import plotly.express as px
 
-from sklearn.preprocessing import OneHotEncoder
-
 # TODO block1(start): This code don`t belong to this file
-
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.base import BaseEstimator, TransformerMixin
-
-
-class YearsTransformer(BaseEstimator, TransformerMixin):
-    """Apply binarization and ohetransform to 'Год постройки' column"""
-
-    def __init__(self, bin_split=5):
-        self.bin_split = bin_split
-        self.is_fitted = False
-        self.ohe = OneHotEncoder(sparse=False)
-
-    def fit(self, X, Y=None):
-        bins = np.linspace(X.min(), X.max(), self.bin_split)
-        self.bins = bins
-        year = pd.cut(X, bins=self.bins, include_lowest=True)
-        self.ohe.fit(year.to_numpy().reshape(-1, 1))
-        cols_name = self.ohe.get_feature_names_out()
-        self.cols_name = [col.removeprefix('x0_') for col in cols_name]
-        self.is_fitted = True
-        return self
-
-    def transform(self, X):
-        assert self.is_fitted, 'call fit() method first, or use fit_transform()'
-        year = pd.cut(X, bins=self.bins, include_lowest=True)
-        year_ohe = self.ohe.transform(year.to_numpy().reshape(-1, 1))
-        return pd.DataFrame(year_ohe, index=X.index, columns=self.cols_name)
-
-    def inverse_transform(self, X):
-        raise NotImplementedError()
-
-    def fit_transform(self, X, Y=None):
-        self.fit(X)
-        return self.transform(X)
-
-    def get_feature_names_out(self, input_features):
-        return list(self.cols_name)
-
-
-bin_split = 7
-oheCols = ['Серия', 'Стены', 'Адрес', 'Балкон']
-oheCols.append('Ремонт')
-oheColsDropFirst = ['Счетчик воды', 'Двор', 'Материал окон']
 
 
 def load_column_transformer():
@@ -72,19 +25,16 @@ def load_column_transformer():
 
 def prepare_df_from_user(df_from_user):
     def transform_roads(df):
-        # should count as one whole.
-        assert 'автомобильные мосты' in df.columns
-        assert 'трассы' in df.columns
+        assert set(['автомобильные мосты', 'трассы']).issubset(df.columns)
         df['вид на дороги'] = df['автомобильные мосты'] + df['трассы']
-        # ohe encoding need only 0 and 1.
+        # ohe encoding need only 0 and 1. Truncating all above to 1.
         df['вид на дороги'][df['вид на дороги'] > 1] = 1
         df.drop(columns=['автомобильные мосты', 'трассы'], inplace=True)
         return df
 
     def transform_view(df):
-        assert 'памятники архитектуры' in df.columns
-        assert 'культуры' in df.columns
-        assert 'пешеходные бульвары' in df.columns
+        assert set(['памятники архитектуры', 'культуры',
+                    'пешеходные бульвары']).issubset(df.columns)
         df['вид на культуру'] = df['памятники архитектуры'] + \
             df['культуры'] + df['пешеходные бульвары']
         df['вид на культуру'][df['вид на культуру'] > 1] = 1
@@ -247,19 +197,19 @@ def adressFeatDash():
 
 def yearFeatDash():
     return dcc.Input(
-        id='year', type='number', min=1900, max=2021
+        id='year', type='number', min=1934, max=2021
     )
 
 
 def squareFeatDash():
     return dcc.Input(
-        id='square', type='number', min=1, max=10000
+        id='square', type='number', min=2, max=1000
     )
 
 
 def ceilHeightFeatDash():
     return dcc.Input(
-        id='ceilHeight', type='number', min=0, max=100
+        id='ceilHeight', type='number', min=1, max=6
     )
 
 
@@ -333,10 +283,12 @@ app.layout = html.Div(children=[
         html.H4('Тип ремонта:'),
         renovationFeatDash(),
         html.Br()
-        ])
     ])
+])
 
 # make prediction after button pressed
+
+
 @app.callback(
     Output(component_id='prediction-output', component_property='children'),
     Input('predict-button-state', 'n_clicks'),
