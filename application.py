@@ -85,12 +85,21 @@ def convert2DataFrame(CURRENT_DATA_FROM_USER):
     # create dict based on values in DATA_FROM_USER
     d = {}
     for col in cols_to_handle:
-        d[col] = 1 if col in data_in_USER_DATA else 0
+        d[col] = 1 if col.lower() in data_in_USER_DATA else 0
 
     df_streetView_and_parking = pd.DataFrame.from_dict(d, orient='index').T
     df = pd.DataFrame.from_dict(CURRENT_DATA_FROM_USER, orient='index').T
     df.columns = cols
     df = df.join(df_streetView_and_parking)
+    print(df.dtypes)
+    # convert col types
+    numeric_float_cols = ['Высота потолков', 'Общая площадь']
+    numeric_int_cols = ['всего этажей', 'Год постройки', 'Комнатность']
+    object_cols = ['Материал окон', 'Счетчик воды', 'Балкон', 'Серия', 'Стены', 'Адрес', 'Двор', 'Ремонт']
+    df[numeric_float_cols] = df[numeric_float_cols].astype(float)
+    df[numeric_int_cols] = df[numeric_int_cols].astype(int)
+    df[object_cols] = df[object_cols].astype(object)
+    print(df.dtypes)
     return df
 
 
@@ -334,6 +343,7 @@ def makePredict(n_clicks, sv, pk, wm, wc, blc, tf,
     CURRENT_X_DATA['yardType'] = yd
     CURRENT_X_DATA['roomNumber'] = rn
     CURRENT_X_DATA['renovation'] = ren
+    print(CURRENT_X_DATA)
 
     df = convert2DataFrame(CURRENT_X_DATA)
     df = prepare_df_from_user(df)
