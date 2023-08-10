@@ -21,6 +21,8 @@ After installing all this libraries, you should be able to use
 ## Structure of project
 * data
 Inside data folder lies data in `csv` format, used in code. CSV files are pretty small size.
+* images
+Contains some images acquired from data analysis notebook.
 * models
 Inside models folder lies model, saved with `pickle` module help.
 There is also pipeline, contains ColumnTransformer, that was created in `data analysis.ipynb` saved with `dill` package.
