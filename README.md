@@ -26,5 +26,5 @@ Inside models folder lies model, saved with `pickle` module help.
 There is also pipeline, contains ColumnTransformer, that was created in `data analysis.ipynb` saved with `dill` package.
 * notebooks
 Inside notebooks folder lies 2 jupyter notebooks. The one with name `getting_cleared_data` clearing the data: remove NaN vaues, bad columns, etc.
-Second one named `data aanalysis` contains thorough data analysis: building plots and their analysis, ANOVA, building pipeline for data transformation.  
-The last one, `model_building.ipynb` contains steps to build ML model: learning, model comparison (including baseline), metrics analysis.
+Second one named `data analysis` contains thorough data analysis: building plots and their analysis, ANOVA, building pipeline for data transformation.  
+The last one, `model_building` contains steps to build ML model: learning, model comparison (including baseline), metrics analysis.
